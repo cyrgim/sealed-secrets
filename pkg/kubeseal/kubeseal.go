@@ -247,13 +247,23 @@ func Seal(clientConfig ClientConfig, outputFormat string, in io.Reader, out io.W
 			secret.Annotations = ssv1alpha1.UpdateScopeAnnotations(secret.Annotations, scope)
 		}
 
-		if ssv1alpha1.SecretScope(secret) != ssv1alpha1.ClusterWideScope && secret.GetNamespace() == "" {
-			ns, _, err := clientConfig.Namespace()
-			if clientcmd.IsEmptyConfig(err) {
-				return fmt.Errorf("input secret has no namespace and cannot infer the namespace automatically when no kube config is available")
-			} else if err != nil {
+		if ssv1alpha1.SecretScope(secret) != ssv1alpha1.ClusterWideScope {
+			ns, namespaceSet, err := clientConfig.Namespace()
+
+			if secret.GetNamespace() == "" {
+				if clientcmd.IsEmptyConfig(err) {
+					return fmt.Errorf("input secret has no namespace and cannot infer the namespace automatically when no kube config is available")
+				}
+			}
+
+			if err != nil {
 				return err
 			}
+
+			if namespaceSet && secret.GetNamespace() != ns {
+				return fmt.Errorf("namespace mismatch: the secret's namespace '%s' does not match the specified namespace '%s'.", secret.GetNamespace(), ns)
+			}
+
 			secret.SetNamespace(ns)
 		}
 
